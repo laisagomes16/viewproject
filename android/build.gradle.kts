@@ -1,3 +1,18 @@
+
+import org.gradle.kotlin.dsl.*       // para Directory etc.
+import java.io.File
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Google Services plugin
+        classpath("com.google.gms:google-services:4.4.0")
+    }
+}
+
 allprojects {
     repositories {
         google()

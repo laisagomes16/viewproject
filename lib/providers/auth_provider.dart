@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
@@ -37,9 +38,8 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final _dio = Dio();
-  //static const _baseUrl = 'http://localhost:8080/api/v1';
+  // Use 10.0.2.2 para Android Emulator. Use localhost se estiver rodando no navegador.
   static const _baseUrl = 'http://10.0.2.2:8080/api/v1';
-
 
   AuthNotifier() : super(AuthState());
 
@@ -56,12 +56,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
           },
         ),
       );
-      
+
       final token = response.data['access_token'];
+      final user = UserModel.fromJson(response.data['user']);
       await _saveToken(token);
-      
+
       state = state.copyWith(
         isLoading: false,
+        user: user,
         token: token,
       );
     } on DioException catch (e) {
@@ -73,14 +75,61 @@ class AuthNotifier extends StateNotifier<AuthState> {
         backendMessage += '\n' + e.message!;
       }
 
-      //print('Erro Dio: $backendMessage');
+      print("Erro back: " + backendMessage);
 
       state = state.copyWith(
         isLoading: false,
         error: backendMessage,
       );
     } catch (e) {
-      print('Erro inesperado: $e');
+      print("Erro cath: " + e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Erro inesperado: ${e.toString()}',
+      );
+    }
+  }
+
+  Future<void> loginWithGoogle(String accessToken) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/auth/google',
+        data: {'token': accessToken},
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      final token = response.data['access_token'];
+      final user = UserModel.fromJson(response.data['user']);
+      await _saveToken(token);
+
+      state = state.copyWith(
+        isLoading: false,
+        user: user,
+        token: token,
+      );
+    } on DioException catch (e) {
+      String backendMessage = 'Erro ao autenticar com Google.';
+
+      if (e.response != null && e.response?.data != null) {
+        backendMessage += '\n' + (e.response?.data['error'] ?? e.response.toString());
+      } else {
+        backendMessage += '\n' + e.message!;
+      }
+
+      print("Erro back: " + backendMessage);
+
+      state = state.copyWith(
+        isLoading: false,
+        error: backendMessage,
+      );
+    } catch (e) {
+      print("Erro ines: " + e.toString());
       state = state.copyWith(
         isLoading: false,
         error: 'Erro inesperado: ${e.toString()}',
@@ -100,10 +149,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'password_confirmation': passwordConfirmation,
         },
       );
-      
+
       final user = UserModel.fromJson(response.data['user']);
       await login(email, password);
-      
+
       state = state.copyWith(
         isLoading: false,
         user: user,
@@ -135,4 +184,4 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
   }
-} 
+}
