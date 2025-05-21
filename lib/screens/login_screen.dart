@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'project_list_screen.dart';
@@ -26,9 +28,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _login() async {
     if (_formKey.currentState!.validate()) {
       await ref.read(authProvider.notifier).login(
-        _emailController.text,
-        _passwordController.text,
-      );
+            _emailController.text,
+            _passwordController.text,
+          );
 
       final error = ref.read(authProvider).error;
       if (error != null) {
@@ -42,6 +44,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           MaterialPageRoute(builder: (_) => const ProjectListScreen()),
         );
       }
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    final googleSignIn = GoogleSignIn();
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) return;
+
+    final googleAuth = await googleUser.authentication;
+    final accessToken = googleAuth.accessToken;
+
+    if (accessToken == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Falha ao obter token do Google")),
+      );
+      return;
+    }
+
+    await ref.read(authProvider.notifier).loginWithGoogle(accessToken);
+
+    final error = ref.read(authProvider).error;
+    if (error != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    } else {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const ProjectListScreen()),
+      );
     }
   }
 
@@ -105,6 +139,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       : const Text('Entrar'),
                 ),
                 const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  icon: Image.asset(
+                    'assets/google_logo.png',
+                    height: 24,
+                  ),
+                  label: const Text('Entrar com Google'),
+                  onPressed: state.isLoading ? null : _loginWithGoogle,
+                ),
+                const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).push(
@@ -120,4 +163,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-} 
+}
